@@ -1,0 +1,12 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.rc text eol=lf
+*.mk text eol=lf
+*.bp text eol=lf
+*.conf text eol=lf
+*.config text eol=lf
+*.fragment text eol=lf
+*.rules text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.bat text eol=crlf
