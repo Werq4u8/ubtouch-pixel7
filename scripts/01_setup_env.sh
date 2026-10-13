@@ -82,12 +82,10 @@ DEPENDENCY_PACKAGES=(
     llvm
     lld
     binutils
-    gcc-multilib
-    g++-multilib
     gcc-aarch64-linux-gnu
     g++-aarch64-linux-gnu
     crossbuild-essential-arm64
-    libc6-dev-i386
+
 
     # Утилиты генерации кода и сборки
     bison

@@ -187,17 +187,16 @@ jobs:
           <?xml version="1.0" encoding="UTF-8"?>
           <manifest>
             <!-- Pixel 7 Device Trees -->
-            <project path="device/google/panther" name="LineageOS/android_device_google_panther" remote="github" revision="lineage-20.0" />
-            <project path="device/google/pantah" name="LineageOS/android_device_google_pantah" remote="github" revision="lineage-20.0" />
-            <project path="kernel/google/gs201" name="LineageOS/android_kernel_google_gs201" remote="github" revision="lineage-20.0" />
-            <project path="hardware/google/pixel" name="LineageOS/android_hardware_google_pixel" remote="github" revision="lineage-20.0" />
+            <project path="device/google/panther" name="LineageOS/android_device_google_panther" remote="github" revision="lineage-20" />
+            <project path="device/google/pantah" name="LineageOS/android_device_google_pantah" remote="github" revision="lineage-20" />
+            <project path="device/google/gs201" name="LineageOS/android_device_google_gs201" remote="github" revision="lineage-20" />
+            <project path="device/google/gs-common" name="LineageOS/android_device_google_gs-common" remote="github" revision="lineage-20" />
+            <project path="kernel/google/gs201" name="LineageOS/android_kernel_google_gs201" remote="github" revision="lineage-20" />
 
             <!-- Proprietary Vendor Blobs for Pantah / Panther -->
-            <project path="vendor/google/panther" name="TheMuppets/proprietary_vendor_google_panther" remote="github" revision="lineage-20.0" />
-            <project path="vendor/google/pantah" name="TheMuppets/proprietary_vendor_google_pantah" remote="github" revision="lineage-20.0" />
-
-            <!-- Halium Core Components -->
-            <project path="halium/hybris-boot" name="Halium/hybris-boot" remote="github" revision="halium-13.0" />
+            <project path="vendor/google/panther" name="TheMuppets/proprietary_vendor_google_panther" remote="github" revision="lineage-20" />
+            <project path="vendor/google/pantah" name="TheMuppets/proprietary_vendor_google_pantah" remote="github" revision="lineage-20" />
+            <project path="vendor/google/gs201" name="TheMuppets/proprietary_vendor_google_gs201" remote="github" revision="lineage-20" />
           </manifest>
           EOF
 
@@ -217,6 +216,8 @@ jobs:
           cp -v ${{ github.workspace }}/device/panther/halium.mk device/google/panther/
           cp -v ${{ github.workspace }}/device/panther/vendorsetup.sh device/google/panther/
           cp -v ${{ github.workspace }}/device/panther/init.halium.rc device/google/panther/
+          cp -v ${{ github.workspace }}/device/panther/usb-insert-hook.sh device/google/panther/
+
 
           # If prebuilt kernel artifacts were fetched, place them in the device kernel dir
           if [ -d "${{ github.workspace }}/kernel_artifacts" ]; then

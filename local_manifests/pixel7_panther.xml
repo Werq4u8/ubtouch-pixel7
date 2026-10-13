@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
-    <!-- Удаление возможных конфликтующих дефолтных репозиториев AOSP/Lineage -->
-    <remove-project name="LineageOS/android_device_google_panther" />
-    <remove-project name="LineageOS/android_device_google_pantah" />
-    <remove-project name="LineageOS/android_device_google_gs201" />
-    <remove-project name="LineageOS/android_device_google_gs-common" />
-    <remove-project name="LineageOS/android_kernel_google_gs201" />
 
     <!-- Google Pixel 7 (panther) & Pixel 7 Pro (cheetah) Pantah Device Trees -->
     <project name="LineageOS/android_device_google_panther"
