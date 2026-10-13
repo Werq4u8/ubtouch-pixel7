@@ -1,0 +1,81 @@
+#
+# Copyright (C) 2023-2024 The Halium Project
+#
+# Init configuration for Google Pixel 7 (panther / pantah) under Halium 13
+#
+
+on early-init
+    # Set SELinux to permissive mode for Halium / Ubuntu Touch bringup
+    write /sys/fs/selinux/enforce 0
+    setprop ro.boot.selinux permissive
+
+    # Create mount points for Halium rootfs and host-guest shared filesystem
+    mkdir /halium 0755 root root
+    mkdir /data/ubuntu 0755 root root
+    mkdir /dev/binderfs 0755 root root
+
+on init
+    # Configure Android Binder IPC permissions for Ubuntu Touch host services
+    # Android 13 uses binderfs by default; ensure mount and accessible permissions
+    mount binder binder /dev/binderfs stats=global
+    chmod 0755 /dev/binderfs
+    chmod 0666 /dev/binderfs/binder
+    chmod 0666 /dev/binderfs/hwbinder
+    chmod 0666 /dev/binderfs/vndbinder
+
+    symlink /dev/binderfs/binder /dev/binder
+    symlink /dev/binderfs/hwbinder /dev/hwbinder
+    symlink /dev/binderfs/vndbinder /dev/vndbinder
+
+    chmod 0666 /dev/binder
+    chmod 0666 /dev/hwbinder
+    chmod 0666 /dev/vndbinder
+
+    # Grant permissions to GPU/DMA buffer nodes (Tensor G2 / Mali-G710)
+    chmod 0666 /dev/mali0
+    chmod 0666 /dev/ion
+    chmod 0666 /dev/dma_heap/system
+    chmod 0666 /dev/dma_heap/system-uncached
+    chmod 0666 /dev/dri/card0
+    chmod 0666 /dev/dri/renderD128
+
+on post-fs
+    # Mount Halium Ubuntu Touch rootfs image if hosted inside userdata partition
+    # Checks for loop-mounted /data/ubuntu.img or rootfs partition
+    exec - root root -- /system/bin/sh -c "if [ -f /data/ubuntu.img ] && [ ! -d /halium/usr ]; then mount -o loop,rw /data/ubuntu.img /data/ubuntu && mount --bind /data/ubuntu /halium; fi"
+
+on post-fs-data
+    # Ensure necessary communication sockets and shared IPC paths exist
+    mkdir /dev/socket/halium 0770 root system
+
+on boot
+    # Configure network bridge and virtual ethernet between Android and Ubuntu host
+    # This enables Android container to communicate with Ubuntu network daemon and RNDIS debug interface
+    exec - root root -- /system/bin/sh -c "ip link add name lxcbr0 type bridge || true"
+    exec - root root -- /system/bin/sh -c "ip addr add 192.168.2.1/24 dev lxcbr0 || true"
+    exec - root root -- /system/bin/sh -c "ip link set lxcbr0 up || true"
+
+    # USB Gadget configuration for Telnet / SSH debugging during boot
+    setprop sys.usb.config rndis,adb
+
+    # Stop standard Android UI stack: Lomiri / Mir manages display and compositor
+    stop surfaceflinger
+    stop zygote
+    stop zygote_secondary
+
+    # Keep essential HAL services running in container:
+    # hwservicemanager, vndservicemanager, servicemanager, graphics.allocator, sensors, radio
+    start servicemanager
+    start hwservicemanager
+    start vndservicemanager
+
+# Service to launch and monitor the Halium LXC container environment
+service halium-lxc /system/bin/sh /vendor/bin/halium-lxc-start
+    class main
+    user root
+    group root system
+    disabled
+    oneshot
+
+on property:sys.boot_completed=1
+    start halium-lxc

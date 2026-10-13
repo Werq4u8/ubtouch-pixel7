@@ -1,0 +1,26 @@
+# Udev rules for Google Pixel 7 (panther / gs201)
+
+# Graphics - Arm Mali-G710 GPU
+KERNEL=="mali0", MODE="0666", GROUP="video"
+
+# Input devices - Touchscreen & Physical Buttons
+SUBSYSTEM=="input", ATTR{name}=="synaptics_tcm*", ENV{ID_INPUT_TOUCHSCREEN}="1", SYMLINK+="input/touchscreen0"
+SUBSYSTEM=="input", ATTR{name}=="goodix*", ENV{ID_INPUT_TOUCHSCREEN}="1", SYMLINK+="input/touchscreen0"
+KERNEL=="event*", SUBSYSTEM=="input", MODE="0660", GROUP="input"
+
+# Android Binder & IPC devices
+KERNEL=="binder", MODE="0666", GROUP="users"
+KERNEL=="hwbinder", MODE="0666", GROUP="users"
+KERNEL=="vndbinder", MODE="0666", GROUP="users"
+KERNEL=="binderfs", MODE="0666", GROUP="users"
+
+# Camera & Tensor ISP devices
+KERNEL=="video[0-9]*", GROUP="video", MODE="0660"
+KERNEL=="media[0-9]*", GROUP="video", MODE="0660"
+
+# Bluetooth & Serial interfaces
+KERNEL=="ttySAC[0-9]*", GROUP="dialout", MODE="0660"
+KERNEL=="ttyGS[0-9]*", GROUP="dialout", MODE="0660"
+
+# Broadcom Wi-Fi
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="*", NAME="wlan0"

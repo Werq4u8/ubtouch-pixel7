@@ -1,0 +1,6 @@
+service ubtouch-camera-bridge /vendor/bin/ubtouch-camera-bridge -s /dev/socket/ubtouch-camera -p internal/0
+    class main
+    user camera
+    group camera system
+    capabilities SYS_NICE
+    socket ubtouch-camera stream 0666 camera camera

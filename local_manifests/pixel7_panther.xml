@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+    <!-- Удаление возможных конфликтующих дефолтных репозиториев AOSP/Lineage -->
+    <remove-project name="LineageOS/android_device_google_panther" />
+    <remove-project name="LineageOS/android_device_google_pantah" />
+    <remove-project name="LineageOS/android_device_google_gs201" />
+    <remove-project name="LineageOS/android_device_google_gs-common" />
+    <remove-project name="LineageOS/android_kernel_google_gs201" />
+
+    <!-- Google Pixel 7 (panther) & Pixel 7 Pro (cheetah) Pantah Device Trees -->
+    <project name="LineageOS/android_device_google_panther"
+             path="device/google/panther"
+             remote="github"
+             revision="lineage-20" />
+
+    <project name="LineageOS/android_device_google_pantah"
+             path="device/google/pantah"
+             remote="github"
+             revision="lineage-20" />
+
+    <!-- Google Tensor G2 Platform & Common Trees -->
+    <project name="LineageOS/android_device_google_gs201"
+             path="device/google/gs201"
+             remote="github"
+             revision="lineage-20" />
+
+    <project name="LineageOS/android_device_google_gs-common"
+             path="device/google/gs-common"
+             remote="github"
+             revision="lineage-20" />
+
+    <!-- Ядро Linux 5.10 для Google Tensor G2 (gs201) -->
+    <project name="LineageOS/android_kernel_google_gs201"
+             path="kernel/google/gs201"
+             remote="github"
+             revision="lineage-20" />
+
+    <!-- Проприетарные бинарные блобы вендора (TheMuppets) -->
+    <project name="TheMuppets/proprietary_vendor_google_panther"
+             path="vendor/google/panther"
+             remote="github"
+             revision="lineage-20" />
+
+    <project name="TheMuppets/proprietary_vendor_google_pantah"
+             path="vendor/google/pantah"
+             remote="github"
+             revision="lineage-20" />
+
+    <project name="TheMuppets/proprietary_vendor_google_gs201"
+             path="vendor/google/gs201"
+             remote="github"
+             revision="lineage-20" />
+</manifest>

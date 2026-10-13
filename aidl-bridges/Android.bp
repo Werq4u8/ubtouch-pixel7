@@ -1,0 +1,12 @@
+//
+// Copyright (C) 2024 The Ubuntu Touch Pixel 7 Porting Project
+//
+// Master Soong build file for all Ubuntu Touch AIDL Bridges
+//
+
+subdirs = [
+    "radio-bridge",
+    "camera-bridge",
+    "audio-bridge",
+    "gnss-bridge",
+]

@@ -1,0 +1,15 @@
+# Device identification information for Ubuntu Touch
+DEVICE="panther"
+NAME="Google Pixel 7"
+CODENAME="panther"
+FAMILY="pantah"
+SOC="gs201"
+GRID_UNIT_PX=18
+FORM_FACTOR="phone"
+DISPLAY_WIDTH=1080
+DISPLAY_HEIGHT=2400
+DISPLAY_REFRESH_RATE=90
+MODEM_TYPE="shannon"
+WIFI_MODULE="bcm4389"
+GPU_DRIVER="mali"
+EOF

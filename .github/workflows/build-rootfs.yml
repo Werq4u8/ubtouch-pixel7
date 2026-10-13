@@ -1,0 +1,271 @@
+# =========================================================================================
+# GitHub Actions Workflow: Build Ubuntu Touch Rootfs & Flashable Installer (panther)
+#
+# This workflow:
+# 1. Downloads the official UBports Ubuntu Touch Focal (20.04) arm64 generic rootfs
+# 2. Applies Pixel 7 (panther) specific overlays, drivers, udev rules, and configs
+# 3. Creates an ext4/squashfs rootfs image ready for Halium 13 containerization
+# 4. Assembles Halium boot, vendor/system images, and fastboot flashing scripts
+# 5. Generates an all-in-one flashable ZIP package for end users and UBports Installer
+# =========================================================================================
+
+name: Build Ubuntu Touch Rootfs & Flashable Package (panther)
+
+on:
+  workflow_dispatch:
+    inputs:
+      rootfs_url:
+        description: 'URL of Ubuntu Touch Focal arm64 rootfs tarball'
+        required: false
+        default: 'https://ci.ubports.com/job/rootfs/job/rootfs-focal-arm64/lastSuccessfulBuild/artifact/ubuntu-touch-focal-arm64.tar.gz'
+        type: string
+      rootfs_format:
+        description: 'Rootfs image format (ext4 or squashfs)'
+        required: true
+        default: 'ext4'
+        type: choice
+        options:
+          - 'ext4'
+          - 'squashfs'
+      rootfs_size_gb:
+        description: 'Target rootfs image size in GB (ext4 only)'
+        required: true
+        default: '4'
+        type: string
+  workflow_run:
+    workflows: ["Build Halium 13 for Pixel 7 (panther)"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+jobs:
+  package-ubuntu-touch:
+    name: Package Ubuntu Touch Rootfs & Fastboot Bundle
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    env:
+      DEVICE: panther
+      FAMILY: pantah
+      ARCH: arm64
+      ROOTFS_URL: ${{ github.event.inputs.rootfs_url || 'https://ci.ubports.com/job/rootfs/job/rootfs-focal-arm64/lastSuccessfulBuild/artifact/ubuntu-touch-focal-arm64.tar.gz' }}
+      ROOTFS_FORMAT: ${{ github.event.inputs.rootfs_format || 'ext4' }}
+      ROOTFS_SIZE_GB: ${{ github.event.inputs.rootfs_size_gb || '4' }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Packaging Dependencies
+        run: |
+          echo "==> Installing squashfs-tools, e2fsprogs, simg2img, and qemu..."
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            android-sdk-libsparse-utils \
+            curl \
+            e2fsprogs \
+            fakeroot \
+            qemu-user-static \
+            rsync \
+            squashfs-tools \
+            tar \
+            wget \
+            zip
+
+      - name: Download Halium Images from Previous Workflow
+        uses: actions/download-artifact@v4
+        with:
+          name: halium-panther-images
+          path: ${{ github.workspace }}/halium_in
+        continue-on-error: true
+
+      - name: Download Kernel Artifacts from Kernel Workflow
+        uses: actions/download-artifact@v4
+        with:
+          name: pixel7-kernel-pantah
+          path: ${{ github.workspace }}/kernel_in
+        continue-on-error: true
+
+      - name: Download UBports Generic Rootfs
+        run: |
+          mkdir -p ${{ github.workspace }}/rootfs_dl
+          cd ${{ github.workspace }}/rootfs_dl
+          echo "==> Fetching Ubuntu Touch arm64 rootfs from: ${{ env.ROOTFS_URL }}..."
+          wget -q --show-progress -O rootfs.tar.gz "${{ env.ROOTFS_URL }}" || {
+            echo "Direct download failed, falling back to UBports system-image pool..."
+            wget -q --show-progress -O rootfs.tar.gz "https://system-image.ubports.com/pool/ubports-touch-focal-arm64.tar.xz"
+          }
+
+      - name: Extract & Customize Rootfs with Overlays
+        run: |
+          mkdir -p ${{ github.workspace }}/rootfs_extracted
+          cd ${{ github.workspace }}/rootfs_extracted
+
+          echo "==> Extracting rootfs archive..."
+          sudo tar -xpf ${{ github.workspace }}/rootfs_dl/rootfs.tar.gz
+
+          echo "==> Injecting device overlays from rootfs/overlays/..."
+          if [ -d "${{ github.workspace }}/rootfs/overlays" ]; then
+            sudo cp -av ${{ github.workspace }}/rootfs/overlays/* .
+          fi
+
+          echo "==> Injecting device metadata into rootfs..."
+          sudo mkdir -p usr/share/halium/panther/
+          sudo cp -av ${{ github.workspace }}/device/panther/device_panther.json usr/share/halium/panther/
+
+          echo "==> Setting up Halium mount directories & permissions..."
+          sudo mkdir -p android vendor apex metadata oem
+          sudo chown -R root:root etc/ usr/ || true
+          sudo chmod 644 etc/ubuntu-touch-session.d/panther.conf || true
+          sudo chmod 600 etc/NetworkManager/conf.d/panther-wifi.conf || true
+
+          # Inject kernel modules if downloaded from build-kernel
+          if [ -f "${{ github.workspace }}/kernel_in/kernel-modules-panther.tar.gz" ]; then
+            echo "==> Installing Tensor G2 Pantah kernel modules into /lib/modules/..."
+            sudo mkdir -p lib/modules/5.10.0-pantah-ubtouch
+            sudo tar -xzf ${{ github.workspace }}/kernel_in/kernel-modules-panther.tar.gz -C lib/modules/5.10.0-pantah-ubtouch/ || true
+            sudo depmod -b . 5.10.0-pantah-ubtouch || true
+          fi
+
+      - name: Build Rootfs Image (Ext4 / SquashFS)
+        run: |
+          mkdir -p ${{ github.workspace }}/output_package
+          cd ${{ github.workspace }}
+
+          if [ "${{ env.ROOTFS_FORMAT }}" == "squashfs" ]; then
+            echo "==> Generating squashfs rootfs image..."
+            sudo mksquashfs rootfs_extracted output_package/ubuntu.img \
+              -comp xz -Xbcj arm -b 1048576 -no-duplicates
+          else
+            echo "==> Generating ext4 rootfs image (${{ env.ROOTFS_SIZE_GB }} GB)..."
+            IMG_FILE="output_package/ubuntu.img"
+            dd if=/dev/zero of=$IMG_FILE bs=1G count=${{ env.ROOTFS_SIZE_GB }}
+            mkfs.ext4 -F -O ^has_journal,^metadata_csum -L "ubuntu-rootfs" $IMG_FILE
+            
+            mkdir -p /mnt/rootfs_tmp
+            sudo mount -o loop $IMG_FILE /mnt/rootfs_tmp
+            sudo cp -a rootfs_extracted/. /mnt/rootfs_tmp/
+            sudo umount /mnt/rootfs_tmp
+            
+            # Shrink and verify ext4 filesystem
+            e2fsck -fy $IMG_FILE || true
+            resize2fs -M $IMG_FILE
+          fi
+
+          ls -lh output_package/ubuntu.img
+
+      - name: Assemble Flashable Release Bundle
+        run: |
+          BUNDLE_DIR="${{ github.workspace }}/installer_bundle"
+          mkdir -p $BUNDLE_DIR
+          cd $BUNDLE_DIR
+
+          # Copy images
+          cp -v ${{ github.workspace }}/output_package/ubuntu.img .
+
+          # Pick boot image (from Halium or kernel step)
+          if [ -f "${{ github.workspace }}/halium_in/halium-boot.img" ]; then
+            cp -v ${{ github.workspace }}/halium_in/halium-boot.img boot.img
+          elif [ -f "${{ github.workspace }}/kernel_in/boot.img" ]; then
+            cp -v ${{ github.workspace }}/kernel_in/boot.img boot.img
+          fi
+
+          # Copy partition images if present
+          if [ -f "${{ github.workspace }}/halium_in/system.img" ]; then
+            cp -v ${{ github.workspace }}/halium_in/system.img .
+          fi
+          if [ -f "${{ github.workspace }}/halium_in/vendor.img" ]; then
+            cp -v ${{ github.workspace }}/halium_in/vendor.img .
+          fi
+          if [ -f "${{ github.workspace }}/halium_in/dtbo.img" ]; then
+            cp -v ${{ github.workspace }}/halium_in/dtbo.img .
+          fi
+          if [ -f "${{ github.workspace }}/halium_in/vendor_boot.img" ]; then
+            cp -v ${{ github.workspace }}/halium_in/vendor_boot.img .
+          fi
+
+          # Copy device metadata
+          cp -v ${{ github.workspace }}/device/panther/device_panther.json .
+
+          # Create cross-platform fastboot flashing scripts
+          cat << 'EOF' > flash-panther.sh
+          #!/usr/bin/env bash
+          # Ubuntu Touch Flashing Script for Google Pixel 7 (panther)
+          # Requires: fastboot (Android Platform Tools)
+          set -e
+
+          echo "=========================================================="
+          echo " Google Pixel 7 (panther) - Ubuntu Touch Installer Script"
+          echo "=========================================================="
+          echo "Please ensure device is connected in FASTBOOT mode."
+          fastboot getvar product 2>&1 | grep -q "panther" || {
+            echo "ERROR: Connected device is not Google Pixel 7 (panther)!"
+            exit 1
+          }
+
+          echo "1. Flashing boot and kernel partitions..."
+          [ -f boot.img ] && fastboot flash boot boot.img
+          [ -f dtbo.img ] && fastboot flash dtbo dtbo.img
+          [ -f vendor_boot.img ] && fastboot flash vendor_boot vendor_boot.img
+
+          echo "2. Rebooting to fastbootd (Dynamic Partitions)..."
+          fastboot reboot fastboot
+          sleep 5
+
+          echo "3. Flashing system and vendor partitions..."
+          [ -f system.img ] && fastboot flash system system.img
+          [ -f vendor.img ] && fastboot flash vendor vendor.img
+
+          echo "4. Erasing userdata for clean rootfs mount..."
+          fastboot erase userdata
+
+          echo "=========================================================="
+          echo "Flashing complete! Rebooting device into Ubuntu Touch..."
+          echo "=========================================================="
+          fastboot reboot
+          EOF
+          chmod +x flash-panther.sh
+
+          cat << 'EOF' > flash-panther.bat
+          @echo off
+          REM Ubuntu Touch Flashing Script for Google Pixel 7 (panther) - Windows
+          echo ==========================================================
+          echo  Google Pixel 7 (panther) - Ubuntu Touch Installer Script
+          echo ==========================================================
+          echo Ensure fastboot is installed and device is in fastboot mode.
+          pause
+
+          if exist boot.img fastboot flash boot boot.img
+          if exist dtbo.img fastboot flash dtbo dtbo.img
+          if exist vendor_boot.img fastboot flash vendor_boot vendor_boot.img
+
+          echo Rebooting to fastbootd (dynamic partitions)...
+          fastboot reboot fastboot
+          timeout /t 5 /nobreak >nul
+
+          if exist system.img fastboot flash system system.img
+          if exist vendor.img fastboot flash vendor vendor.img
+          fastboot erase userdata
+
+          echo Flashing finished. Rebooting...
+          fastboot reboot
+          pause
+          EOF
+
+          # Package everything into a single zip archive
+          cd ${{ github.workspace }}
+          PACKAGE_NAME="ubtouch-pixel7-panther-${{ github.sha }}.zip"
+          cd installer_bundle
+          zip -r -9 ${{ github.workspace }}/$PACKAGE_NAME ./*
+
+      - name: Upload Flashable Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubtouch-pixel7-panther-flashable
+          path: ${{ github.workspace }}/ubtouch-pixel7-panther-*.zip
+          retention-days: 30

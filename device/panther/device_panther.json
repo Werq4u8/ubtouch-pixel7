@@ -1,0 +1,112 @@
+{
+  "name": "Pixel 7",
+  "brand": "Google",
+  "codename": "panther",
+  "family": "pantah",
+  "soc": "Google Tensor G2 (GS201)",
+  "arch": "arm64",
+  "formfactor": "phone",
+  "category": "community",
+  "user_facing": true,
+  "halium_version": 13,
+  "android_version": "13",
+  "kernel_version": "5.10",
+  "display": {
+    "width": 1080,
+    "height": 2400,
+    "ratio": "20:9",
+    "ppi": 416,
+    "refresh_rate": 90
+  },
+  "hardware": {
+    "gpu": "Arm Mali-G710 MP7",
+    "modem": "Samsung Exynos 5300 (Shannon)",
+    "wifi_bt": "Broadcom BCM4389 (Wi-Fi 6E / BT 5.2)",
+    "camera_rear": "50 MP Samsung ISOCELL GN1 + 12 MP Sony IMX381",
+    "camera_front": "10.8 MP Samsung ISOCELL 3J1",
+    "fingerprint": "Goodix optical under-display",
+    "nfc": "STMicroelectronics ST54K"
+  },
+  "partitions": {
+    "type": "dynamic_ab",
+    "fastbootd_required": true,
+    "slots": ["a", "b"],
+    "standard": {
+      "boot": "boot",
+      "init_boot": "init_boot",
+      "vendor_boot": "vendor_boot",
+      "dtbo": "dtbo",
+      "userdata": "userdata"
+    },
+    "dynamic": {
+      "system": "system",
+      "vendor": "vendor",
+      "product": "product",
+      "system_ext": "system_ext"
+    }
+  },
+  "requirements": {
+    "stock_base": "Android 13 (Build TQ3A.230901.001 or equivalent)",
+    "bootloader_unlocked": true,
+    "wipe_data": true
+  },
+  "channels": [
+    {
+      "name": "20.04/arm64/android9plus/devel",
+      "channel_type": "devel",
+      "description": "Ubuntu Touch 20.04 Focal development channel"
+    },
+    {
+      "name": "24.04/arm64/android9plus/devel",
+      "channel_type": "devel_noble",
+      "description": "Ubuntu Touch 24.04 Noble experimental channel"
+    }
+  ],
+  "installer_actions": [
+    {
+      "action": "reboot",
+      "target": "bootloader",
+      "description": "Reboot device into fastboot bootloader"
+    },
+    {
+      "action": "flash",
+      "partition": "boot",
+      "file": "boot.img"
+    },
+    {
+      "action": "flash",
+      "partition": "dtbo",
+      "file": "dtbo.img"
+    },
+    {
+      "action": "flash",
+      "partition": "vendor_boot",
+      "file": "vendor_boot.img"
+    },
+    {
+      "action": "reboot",
+      "target": "fastboot",
+      "description": "Reboot into userspace fastbootd for dynamic partitions"
+    },
+    {
+      "action": "flash",
+      "partition": "system",
+      "file": "system.img"
+    },
+    {
+      "action": "flash",
+      "partition": "vendor",
+      "file": "vendor.img"
+    },
+    {
+      "action": "erase",
+      "partition": "userdata",
+      "description": "Wipe userdata partition for clean rootfs mount"
+    },
+    {
+      "action": "reboot",
+      "target": "system",
+      "description": "Reboot into Ubuntu Touch Lomiri session"
+    }
+  ]
+}

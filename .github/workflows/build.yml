@@ -1,0 +1,64 @@
+name: Build Ubuntu Touch for Pixel 7
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_kernel_only:
+        description: 'Build only Linux 5.10 GKI Kernel'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build:
+    name: Build Port Artifacts
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Maximize Runner Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -a -f || true
+          df -h
+
+      - name: Make Scripts Executable
+        run: |
+          chmod +x scripts/*.sh
+
+      - name: 01 - Setup Build Environment
+        run: |
+          ./scripts/01_setup_env.sh
+
+      - name: 03 - Apply Kernel Configuration & Patches
+        run: |
+          ./scripts/03_patch_kernel.sh
+
+      - name: 06 - Prepare and Package Ubuntu Touch Rootfs
+        run: |
+          ./scripts/06_prepare_rootfs.sh
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixel7-ubtouch-images
+          path: |
+            out/images/rootfs.img
+            out/images/boot.img
+            out/images/*.zip
+            out/images/*.tar.gz
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,284 @@
+# =========================================================================================
+# GitHub Actions Workflow: Build Halium 13 for Google Pixel 7 (panther)
+#
+# IMPORTANT NOTICE REGARDING RUNNER SPECIFICATIONS & RESOURCE LIMITS:
+# Full Android / LineageOS 20 tree synchronization and compilation requires:
+#   - Disk Space: ~250 GB minimum (AOSP tree + artifacts + ccache)
+#   - RAM: >= 32 GB (or 16 GB physical + 16 GB swap minimum to avoid Soong/Ninja OOM)
+#   - Build Time: 3 to 6 hours on 16 vCPUs.
+#
+# Standard GitHub-hosted runners (ubuntu-22.04) have:
+#   - 2 vCPUs, 7 GB RAM, and ~14 GB available free disk space.
+#
+# Consequently, executing a full AOSP/Halium build on standard GitHub free runners WILL
+# EXCEED storage and memory limits. It is strongly recommended to run this workflow on:
+#   1. A Self-Hosted Runner (e.g., bare-metal or cloud VM with >= 16 cores, 32GB RAM, 300GB SSD)
+#   2. GitHub-hosted Larger Runners (e.g. ubuntu-22.04-16core or ubuntu-22.04-32core)
+# =========================================================================================
+
+name: Build Halium 13 for Pixel 7 (panther)
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'device/**'
+      - '.github/workflows/build-halium.yml'
+  workflow_dispatch:
+    inputs:
+      runner_label:
+        description: 'Runner label (use "self-hosted" for dedicated host or "ubuntu-22.04")'
+        required: false
+        default: 'ubuntu-22.04'
+        type: string
+      build_target:
+        description: 'Target images to build'
+        required: true
+        default: 'halium-boot systemimage'
+        type: choice
+        options:
+          - 'halium-boot systemimage'
+          - 'bootimage vendorimage systemimage'
+          - 'halium-boot'
+      clean_ccache:
+        description: 'Purge existing ccache'
+        required: false
+        default: false
+        type: boolean
+  workflow_run:
+    workflows: ["Build Pixel 7 Kernel (Tensor G2 / Pantah)"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+jobs:
+  build-halium:
+    name: Build Halium 13 (LineageOS 20 Base)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ${{ github.event.inputs.runner_label || 'ubuntu-22.04' }}
+    timeout-minutes: 480 # 8 hours timeout
+
+    env:
+      DEVICE: panther
+      DEVICE_FAMILY: pantah
+      VENDOR: google
+      HALIUM_BRANCH: lineage-20.0
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      USE_CCACHE: 1
+      WITHOUT_CHECK_API: true
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Free Disk Space (GitHub Hosted Runners Only)
+        if: ${{ !contains(runner.name, 'self-hosted') }}
+        run: |
+          echo "==> Maximizing available disk space on runner..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/swift
+          sudo docker image prune --all --force || true
+          df -h
+
+      - name: Set up 16GB Swap File
+        run: |
+          echo "==> Allocating 16 GB swap file to mitigate ninja/metalava OOM crashes..."
+          if [ ! -f /swapfile ]; then
+            sudo fallocate -l 16G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=16384
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+          else
+            echo "Swapfile already exists."
+          fi
+          free -h
+
+      - name: Install AOSP & LineageOS Build Prerequisites
+        run: |
+          echo "==> Installing build tools and libraries..."
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc \
+            bison \
+            build-essential \
+            ccache \
+            curl \
+            flex \
+            g++-multilib \
+            gcc-multilib \
+            git \
+            git-lfs \
+            gnupg \
+            gperf \
+            imagemagick \
+            lib32ncurses5-dev \
+            lib32readline-dev \
+            lib32z1-dev \
+            libelf-dev \
+            liblz4-tool \
+            libncurses5 \
+            libncurses5-dev \
+            libsdl1.2-dev \
+            libssl-dev \
+            libxml2 \
+            libxml2-utils \
+            lzop \
+            ninja-build \
+            openjdk-17-jdk \
+            pngcrush \
+            python3 \
+            python3-pip \
+            rsync \
+            schedtool \
+            squashfs-tools \
+            xsltproc \
+            zip \
+            zlib1g-dev
+
+          # Install Repo tool
+          mkdir -p ~/bin
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+          git config --global user.name "GitHub Actions Porting Bot"
+          git config --global user.email "bot@github.local"
+          git config --global color.ui false
+
+      - name: Setup ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.os }}-halium-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-halium-ccache-
+
+      - name: Download Prebuilt Kernel Artifacts (if available)
+        uses: actions/download-artifact@v4
+        with:
+          name: pixel7-kernel-pantah
+          path: ${{ github.workspace }}/kernel_artifacts
+        continue-on-error: true
+
+      - name: Initialize LineageOS 20 & Halium Manifests
+        run: |
+          mkdir -p ${{ github.workspace }}/halium
+          cd ${{ github.workspace }}/halium
+
+          echo "==> Initializing repo with LineageOS 20.0 base..."
+          repo init -u https://github.com/LineageOS/android.git \
+            -b ${{ env.HALIUM_BRANCH }} \
+            --depth=1 \
+            --git-lfs
+
+          echo "==> Generating local manifests for Google Pixel 7 (pantah / panther)..."
+          mkdir -p .repo/local_manifests
+
+          cat << 'EOF' > .repo/local_manifests/panther.xml
+          <?xml version="1.0" encoding="UTF-8"?>
+          <manifest>
+            <!-- Pixel 7 Device Trees -->
+            <project path="device/google/panther" name="LineageOS/android_device_google_panther" remote="github" revision="lineage-20.0" />
+            <project path="device/google/pantah" name="LineageOS/android_device_google_pantah" remote="github" revision="lineage-20.0" />
+            <project path="kernel/google/gs201" name="LineageOS/android_kernel_google_gs201" remote="github" revision="lineage-20.0" />
+            <project path="hardware/google/pixel" name="LineageOS/android_hardware_google_pixel" remote="github" revision="lineage-20.0" />
+
+            <!-- Proprietary Vendor Blobs for Pantah / Panther -->
+            <project path="vendor/google/panther" name="TheMuppets/proprietary_vendor_google_panther" remote="github" revision="lineage-20.0" />
+            <project path="vendor/google/pantah" name="TheMuppets/proprietary_vendor_google_pantah" remote="github" revision="lineage-20.0" />
+
+            <!-- Halium Core Components -->
+            <project path="halium/hybris-boot" name="Halium/hybris-boot" remote="github" revision="halium-13.0" />
+          </manifest>
+          EOF
+
+      - name: Sync Source Tree
+        run: |
+          cd ${{ github.workspace }}/halium
+          echo "==> Syncing sources (shallow depth=1)..."
+          repo sync -c -j$(nproc) --no-tags --no-clone-bundle --force-sync
+
+      - name: Apply Halium Device Configurations
+        run: |
+          cd ${{ github.workspace }}/halium
+          echo "==> Merging Halium device tree configs from repository..."
+
+          # Copy our customized device configurations into the tree
+          mkdir -p device/google/panther
+          cp -v ${{ github.workspace }}/device/panther/halium.mk device/google/panther/
+          cp -v ${{ github.workspace }}/device/panther/vendorsetup.sh device/google/panther/
+          cp -v ${{ github.workspace }}/device/panther/init.halium.rc device/google/panther/
+
+          # If prebuilt kernel artifacts were fetched, place them in the device kernel dir
+          if [ -d "${{ github.workspace }}/kernel_artifacts" ]; then
+            echo "Injecting prebuilt kernel artifacts..."
+            mkdir -p device/google/panther-kernel
+            cp -v ${{ github.workspace }}/kernel_artifacts/* device/google/panther-kernel/ || true
+          fi
+
+      - name: Configure ccache & Build Environment
+        run: |
+          ccache -M 10G
+          if [ "${{ github.event.inputs.clean_ccache }}" == "true" ]; then
+            ccache -C
+          fi
+          ccache -s
+
+      - name: Build Halium Target Images
+        run: |
+          cd ${{ github.workspace }}/halium
+          source build/envsetup.sh
+
+          echo "==> Configuring lunch combo for halium_panther-userdebug..."
+          lunch halium_panther-userdebug || lunch lineage_panther-userdebug
+
+          TARGET_BUILD="${{ github.event.inputs.build_target || 'halium-boot systemimage' }}"
+          echo "==> Building targets: $TARGET_BUILD"
+          
+          # Run build and stream logs
+          m $TARGET_BUILD 2>&1 | tee ${{ github.workspace }}/halium_build.log
+
+      - name: Collect Output Images
+        if: success()
+        run: |
+          cd ${{ github.workspace }}/halium
+          OUT_DIR="out/target/product/panther"
+          mkdir -p ${{ github.workspace }}/halium_artifacts
+
+          echo "==> Collecting built images from $OUT_DIR..."
+          cp -v $OUT_DIR/boot.img ${{ github.workspace }}/halium_artifacts/halium-boot.img || true
+          cp -v $OUT_DIR/system.img ${{ github.workspace }}/halium_artifacts/system.img || true
+          cp -v $OUT_DIR/vendor.img ${{ github.workspace }}/halium_artifacts/vendor.img || true
+          cp -v $OUT_DIR/dtbo.img ${{ github.workspace }}/halium_artifacts/dtbo.img || true
+          cp -v $OUT_DIR/vendor_boot.img ${{ github.workspace }}/halium_artifacts/vendor_boot.img || true
+
+          ls -lh ${{ github.workspace }}/halium_artifacts/
+
+      - name: Upload Halium Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: halium-panther-images
+          path: ${{ github.workspace }}/halium_artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Halium Build Failure Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: halium-build-failure-logs
+          path: |
+            ${{ github.workspace }}/halium_build.log
+            ${{ github.workspace }}/halium/out/error*.log
+          if-no-files-found: warn
+          retention-days: 7

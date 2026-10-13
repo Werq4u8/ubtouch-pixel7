@@ -1,0 +1,240 @@
+name: Build Pixel 7 Kernel (Tensor G2 / Pantah)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+    paths:
+      - 'kernel/**'
+      - '.github/workflows/build-kernel.yml'
+  workflow_dispatch:
+    inputs:
+      runner_type:
+        description: 'GitHub Runner Type'
+        required: false
+        default: 'ubuntu-22.04'
+        type: choice
+        options:
+          - 'ubuntu-22.04'
+          - 'ubuntu-22.04-16core' # GitHub larger runner (paid / team accounts)
+          - 'self-hosted'
+      build_variant:
+        description: 'Build variant (userdebug recommended for porting)'
+        required: true
+        default: 'userdebug'
+        type: choice
+        options:
+          - 'userdebug'
+          - 'user'
+      clean_build:
+        description: 'Force clean Bazel cache'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+jobs:
+  build-kernel:
+    name: Build Pantah 5.10 Kernel (GKI 2.0 / Kleaf)
+    runs-on: ${{ github.event.inputs.runner_type || 'ubuntu-22.04' }}
+    timeout-minutes: 360 # 6 hours timeout
+
+    env:
+      ANDROID_BRANCH: android-gs-pantah-5.10-android13
+      DEVICE_CODENAME: panther
+      TARGET_DIST: pantah_dist
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      USE_CCACHE: 1
+
+    steps:
+      - name: Checkout project repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Free Disk Space on Runner
+        run: |
+          echo "==> Freeing disk space on runner..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force || true
+          df -h
+
+      - name: Set up Swap Space (16 GB)
+        run: |
+          echo "==> Configuring swap memory to prevent Bazel OOM..."
+          sudo fallocate -l 16G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=16384
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Install Build Dependencies
+        run: |
+          echo "==> Installing system dependencies for Android Kernel / Kleaf build..."
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc \
+            bison \
+            build-essential \
+            ccache \
+            curl \
+            flex \
+            git \
+            git-lfs \
+            gnupg \
+            libelf-dev \
+            libssl-dev \
+            libncurses5-dev \
+            lz4 \
+            python3 \
+            python3-pip \
+            python3-setuptools \
+            rsync \
+            tar \
+            unzip \
+            wget \
+            zip \
+            zstd
+
+          # Install Google repo tool
+          mkdir -p ~/.bin
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > ~/.bin/repo
+          chmod a+rx ~/.bin/repo
+          echo "$HOME/.bin" >> $GITHUB_PATH
+
+          # Configure Git identity for repo sync
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git config --global color.ui false
+
+      - name: Set up ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.os }}-kernel-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-kernel-ccache-
+
+      - name: Set up Bazel Cache
+        if: ${{ !(github.event.inputs.clean_build == 'true') }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel
+          key: ${{ runner.os }}-bazel-cache-${{ hashFiles('kernel/configs/**') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-cache-
+
+      - name: Initialize & Sync Kernel Source
+        run: |
+          mkdir -p ${{ github.workspace }}/kernel_workspace
+          cd ${{ github.workspace }}/kernel_workspace
+
+          echo "==> Initializing repo for branch: ${{ env.ANDROID_BRANCH }}..."
+          repo init -u https://android.googlesource.com/kernel/manifest \
+            -b ${{ env.ANDROID_BRANCH }} \
+            --depth=1 \
+            --no-clone-bundle
+
+          echo "==> Syncing repositories (parallel threads: $(nproc))..."
+          repo sync -c -j$(nproc) --no-tags --no-clone-bundle
+
+      - name: Apply Ubuntu Touch Kernel Config Fragment
+        run: |
+          cd ${{ github.workspace }}/kernel_workspace
+          echo "==> Patching kernel configuration for Ubuntu Touch / Halium compatibility..."
+
+          # Define path to our custom fragment
+          FRAGMENT_SRC="${{ github.workspace }}/kernel/configs/ubtouch_fragment.config"
+          if [ -f "$FRAGMENT_SRC" ]; then
+            echo "Found Ubuntu Touch kernel fragment at $FRAGMENT_SRC"
+            
+            # Destination inside gs201 / pantah kernel build config
+            # Pantah uses GKI 5.10 + Google Tensor modules in private/google-modules/soc/gs
+            TARGET_CONFIG_DIR="private/google-modules/soc/gs"
+            if [ -d "$TARGET_CONFIG_DIR" ]; then
+              cp "$FRAGMENT_SRC" "$TARGET_CONFIG_DIR/ubtouch.config"
+            fi
+            
+            # Also copy to common kernel configs for GKI base
+            COMMON_CONFIG_DIR="common/arch/arm64/configs"
+            if [ -d "$COMMON_CONFIG_DIR" ]; then
+              cp "$FRAGMENT_SRC" "$COMMON_CONFIG_DIR/ubtouch_gki.config"
+            fi
+
+            # Append config fragment to gki_defconfig so Kleaf/Bazel includes it
+            if [ -f "common/arch/arm64/configs/gki_defconfig" ]; then
+              echo "Merging ubtouch fragment into common/arch/arm64/configs/gki_defconfig..."
+              cat "$FRAGMENT_SRC" >> common/arch/arm64/configs/gki_defconfig
+            fi
+          else
+            echo "WARNING: Kernel fragment not found at $FRAGMENT_SRC"
+          fi
+
+      - name: Build Kernel with Kleaf (Bazel)
+        id: build_kernel
+        run: |
+          cd ${{ github.workspace }}/kernel_workspace
+          
+          # Initialize ccache config
+          ccache -M 10G
+          ccache -s
+
+          echo "==> Running Kleaf build for Google Tensor G2 (pantah)..."
+          mkdir -p ${{ github.workspace }}/out/dist
+
+          # Build Pantah target using Bazel / Kleaf
+          # --config=fast speeds up compilation by skipping certain debug symbols if needed
+          BUILD_CMD="tools/bazel run --config=stamp //private/devices/google/pantah:pantah_dist -- --dist_dir=${{ github.workspace }}/out/dist"
+          
+          echo "Executing: $BUILD_CMD"
+          if $BUILD_CMD 2>&1 | tee ${{ github.workspace }}/build.log; then
+            echo "BUILD_STATUS=success" >> $GITHUB_ENV
+          else
+            echo "BUILD_STATUS=failed" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: Package Kernel Modules and Images
+        if: success()
+        run: |
+          cd ${{ github.workspace }}/out/dist
+          echo "==> Inspecting output artifacts in dist directory..."
+          ls -la
+
+          # Collect built boot images and device trees
+          mkdir -p ${{ github.workspace }}/release_artifacts
+          cp -v boot.img ${{ github.workspace }}/release_artifacts/ || true
+          cp -v dtbo.img ${{ github.workspace }}/release_artifacts/ || true
+          cp -v vendor_boot.img ${{ github.workspace }}/release_artifacts/ || true
+          cp -v vendor_kernel_boot.img ${{ github.workspace }}/release_artifacts/ || true
+
+          # Create a tarball of all out-of-tree and GKI modules for Halium rootfs packaging
+          echo "==> Packaging kernel modules (*.ko)..."
+          tar -czvf ${{ github.workspace }}/release_artifacts/kernel-modules-panther.tar.gz *.ko || true
+
+      - name: Upload Kernel Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixel7-kernel-pantah
+          path: ${{ github.workspace }}/release_artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Build Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-build-failure-logs
+          path: |
+            ${{ github.workspace }}/build.log
+            ${{ github.workspace }}/kernel_workspace/out/bazel/execroot/__main__/bazel-out/**/*.log
+          if-no-files-found: warn
+          retention-days: 7

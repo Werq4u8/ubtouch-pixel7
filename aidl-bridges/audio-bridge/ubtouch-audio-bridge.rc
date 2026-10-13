@@ -1,0 +1,6 @@
+service ubtouch-audio-bridge /vendor/bin/ubtouch-audio-bridge -s /dev/socket/ubtouch-audio -m default
+    class main
+    user audio
+    group audio media
+    capabilities SYS_NICE
+    socket ubtouch-audio stream 0666 audio audio

@@ -1,0 +1,7 @@
+service ubtouch-radio-bridge /vendor/bin/ubtouch-radio-bridge -s /dev/socket/ubtouch-radio -i slot1
+    class main
+    user radio
+    group radio net_raw
+    capabilities NET_ADMIN NET_RAW
+    seclabel u:r:rild:s0
+    socket ubtouch-radio stream 0666 radio radio

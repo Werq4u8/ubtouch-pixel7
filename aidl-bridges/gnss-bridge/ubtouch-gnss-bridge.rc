@@ -1,0 +1,6 @@
+service ubtouch-gnss-bridge /vendor/bin/ubtouch-gnss-bridge -s /dev/socket/ubtouch-gnss -i default
+    class main
+    user gps
+    group gps system
+    capabilities NET_RAW
+    socket ubtouch-gnss stream 0666 gps gps

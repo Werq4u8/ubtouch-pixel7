@@ -1,0 +1,91 @@
+{
+  "device": {
+    "name": "panther",
+    "family": "pantah",
+    "model": "Pixel 7",
+    "manufacturer": "Google",
+    "soc": "Google Tensor G2 (GS201)",
+    "android_version": "13",
+    "halium_version": "13.0"
+  },
+  "display": {
+    "width": 1080,
+    "height": 2400,
+    "density": 416,
+    "refresh_rate": 90,
+    "orientation": "portrait",
+    "rotation": 0,
+    "graphics_allocator": "gralloc4",
+    "hwcomposer_version": "2.0"
+  },
+  "backlight": {
+    "type": "sysfs",
+    "brightness_path": "/sys/class/backlight/panel0-backlight/brightness",
+    "max_brightness_path": "/sys/class/backlight/panel0-backlight/max_brightness",
+    "min_brightness": 1,
+    "max_brightness": 4095
+  },
+  "battery": {
+    "type": "sysfs",
+    "path": "/sys/class/power_supply/battery",
+    "capacity_path": "/sys/class/power_supply/battery/capacity",
+    "status_path": "/sys/class/power_supply/battery/status",
+    "present_path": "/sys/class/power_supply/battery/present"
+  },
+  "input": {
+    "touchscreen": {
+      "interface": "evdev",
+      "device_path": "/dev/input/event2",
+      "driver_name": "synaptics_ts",
+      "resolution": [1080, 2400]
+    },
+    "keys": {
+      "power": "/dev/input/event0",
+      "volume": "/dev/input/event1"
+    }
+  },
+  "sensors": {
+    "backend": "hybris-aidl",
+    "chre_enabled": true,
+    "available": [
+      "accelerometer",
+      "gyroscope",
+      "magnetometer",
+      "light",
+      "proximity",
+      "barometer"
+    ]
+  },
+  "audio": {
+    "backend": "hybris-aidl",
+    "alsa_card": "gs201audio",
+    "sample_rate": 48000,
+    "channels": 2,
+    "voice_call_routing": "audio.primary"
+  },
+  "telephony": {
+    "modem_type": "shannon",
+    "chipset": "Samsung Exynos 5300",
+    "ril_backend": "ofono-ril-binder",
+    "sim_slots": 2,
+    "supports_esim": true
+  },
+  "connectivity": {
+    "wifi": {
+      "chipset": "Broadcom BCM4389",
+      "interface": "wlan0",
+      "driver": "brcmfmac",
+      "supports_wifi6e": true
+    },
+    "bluetooth": {
+      "chipset": "Broadcom BCM4389",
+      "interface": "hci0",
+      "uart_port": "/dev/ttySAC1",
+      "firmware_dir": "/vendor/firmware"
+    },
+    "nfc": {
+      "chipset": "STMicroelectronics ST54K",
+      "node": "/dev/st21nfc"
+    }
+  }
+}
