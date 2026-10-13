@@ -41,8 +41,10 @@ on init
 
 on post-fs
     # Mount Halium Ubuntu Touch rootfs image if hosted inside userdata partition
-    # Checks for loop-mounted /data/ubuntu.img or rootfs partition
-    exec - root root -- /system/bin/sh -c "if [ -f /data/ubuntu.img ] && [ ! -d /halium/usr ]; then mount -o loop,rw /data/ubuntu.img /data/ubuntu && mount --bind /data/ubuntu /halium; fi"
+    # If /data/ubuntu.img is missing or encrypted (Android 16 FBE), display
+    # "PLEASE, INSERT UBUNTU-FILE.IMG" on the screen and receive it over USB!
+    exec - root root -- /system/bin/sh /system/bin/usb-insert-hook.sh
+    exec - root root -- /system/bin/sh -c "if [ -f /tmpmnt/ubuntu.img ] && [ ! -d /halium/usr ]; then mount -o loop,rw /tmpmnt/ubuntu.img /data/ubuntu && mount --bind /data/ubuntu /halium; elif [ -f /data/ubuntu.img ] && [ ! -d /halium/usr ]; then mount -o loop,rw /data/ubuntu.img /data/ubuntu && mount --bind /data/ubuntu /halium; fi"
 
 on post-fs-data
     # Ensure necessary communication sockets and shared IPC paths exist
