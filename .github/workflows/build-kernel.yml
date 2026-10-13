@@ -4,9 +4,6 @@ on:
   push:
     branches: [ main, master ]
     tags: [ 'v*' ]
-    paths:
-      - 'kernel/**'
-      - '.github/workflows/build-kernel.yml'
   workflow_dispatch:
     inputs:
       runner_type:
@@ -44,11 +41,12 @@ jobs:
     timeout-minutes: 360 # 6 hours timeout
 
     env:
-      ANDROID_BRANCH: android-gs-pantah-5.10-android13
+      ANDROID_BRANCH: android-gs-pantah-5.10-android14
       DEVICE_CODENAME: panther
       TARGET_DIST: pantah_dist
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       USE_CCACHE: 1
+
 
     steps:
       - name: Checkout project repository

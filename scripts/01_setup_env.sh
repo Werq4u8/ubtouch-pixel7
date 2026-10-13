@@ -117,8 +117,12 @@ DEPENDENCY_PACKAGES=(
     dosfstools
     mtools
     android-sdk-libsparse-utils
+    mkbootimg
+    busybox-static
+    cpio
     device-tree-compiler
     u-boot-tools
+
 
     # Библиотеки и заголовки для AOSP / Host tools
     libncurses5

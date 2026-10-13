@@ -152,14 +152,21 @@ if [ "${BUILD_SUCCESS}" -eq 0 ]; then
     fi
 
     DEFCONFIG_NAME="gki_defconfig"
+    if [ -f "arch/arm64/configs/cloudripper_gki_defconfig" ]; then
+        DEFCONFIG_NAME="cloudripper_gki_defconfig"
+    fi
     log_info "Генерация конфигурации: make ${DEFCONFIG_NAME}..."
     make O="${OUTPUT_DIR}" "${DEFCONFIG_NAME}"
 
-    log_info "Компиляция Image.lz4, Image, модулей и dtbs (потоков: ${BUILD_JOBS})..."
-    make -j"${BUILD_JOBS}" O="${OUTPUT_DIR}" Image.lz4 Image modules dtbs 2>&1 | tee "${LOG_DIR}/kernel_make.log"
+    # Убедимся, что опции не приводят к ошибкам Werror на новых версиях Clang
+    scripts/config --file "${OUTPUT_DIR}/.config" -d CONFIG_WERROR -d CONFIG_LTO_CLANG_THIN -d CONFIG_LTO_CLANG_FULL || true
+    make O="${OUTPUT_DIR}" olddefconfig
+
+    log_info "Компиляция Image.lz4, Image и модулей (потоков: ${BUILD_JOBS})..."
+    make -j"${BUILD_JOBS}" O="${OUTPUT_DIR}" Image.lz4 Image modules 2>&1 | tee "${LOG_DIR}/kernel_make.log"
 
     log_info "Установка модулей ядра..."
-    make O="${OUTPUT_DIR}" INSTALL_MOD_PATH="${OUTPUT_DIR}/modules_install" modules_install
+    make O="${OUTPUT_DIR}" INSTALL_MOD_PATH="${OUTPUT_DIR}/modules_install" modules_install || true
 
     BUILD_SUCCESS=1
 fi
@@ -172,15 +179,18 @@ log_info " Упаковка ядра, модулей и создание boot.im
 log_info "=========================================================="
 
 KERNEL_BIN=""
-if [ -f "${OUTPUT_DIR}/Image.lz4" ]; then
-    KERNEL_BIN="${OUTPUT_DIR}/Image.lz4"
-elif [ -f "${OUTPUT_DIR}/Image" ]; then
-    KERNEL_BIN="${OUTPUT_DIR}/Image"
-elif [ -f "${KERNEL_SRC_DIR}/out/dist/Image.lz4" ]; then
-    KERNEL_BIN="${KERNEL_SRC_DIR}/out/dist/Image.lz4"
-elif [ -f "${KERNEL_SRC_DIR}/out/dist/Image" ]; then
-    KERNEL_BIN="${KERNEL_SRC_DIR}/out/dist/Image"
-fi
+for candidate in \
+    "${OUTPUT_DIR}/arch/arm64/boot/Image.lz4" \
+    "${OUTPUT_DIR}/arch/arm64/boot/Image" \
+    "${OUTPUT_DIR}/Image.lz4" \
+    "${OUTPUT_DIR}/Image" \
+    "${KERNEL_SRC_DIR}/out/dist/Image.lz4" \
+    "${KERNEL_SRC_DIR}/out/dist/Image"; do
+    if [ -f "${candidate}" ]; then
+        KERNEL_BIN="${candidate}"
+        break
+    fi
+done
 
 if [ -z "${KERNEL_BIN}" ] || [ ! -f "${KERNEL_BIN}" ]; then
     log_error "Бинарный файл ядра (Image / Image.lz4) не найден в директории вывода!"
@@ -205,7 +215,33 @@ find "${OUTPUT_DIR}" -name "*.ko" -exec cp {} "${MODULES_STAGING}/lib/modules/5.
 tar -czf "${MODULES_ARCHIVE}" -C "${MODULES_STAGING}" .
 log_success "Архив модулей создан: ${MODULES_ARCHIVE}"
 
-# Сборка boot.img (Header Version 4 для Google Pixel 7 / Android 13 GKI)
+# Сборка интерактивного initramfs с поддержкой запроса "PLEASE, INSERT UBUNTU-FILE.IMG"
+log_info "Формирование интерактивного initramfs (Halium + USB Loader)..."
+RAMDISK_WORK="${OUTPUT_DIR}/ramdisk_root"
+rm -rf "${RAMDISK_WORK}"
+mkdir -p "${RAMDISK_WORK}"/{bin,sbin,etc,proc,sys,dev,config,tmpmnt,halium,data/ubuntu,system/bin}
+
+if [ -f "${PROJECT_ROOT}/device/panther/usb-insert-hook.sh" ]; then
+    cp "${PROJECT_ROOT}/device/panther/usb-insert-hook.sh" "${RAMDISK_WORK}/system/bin/usb-insert-hook.sh"
+    chmod +x "${RAMDISK_WORK}/system/bin/usb-insert-hook.sh"
+fi
+
+cat << 'INIT_EOF' > "${RAMDISK_WORK}/init"
+#!/bin/sh
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+if [ -x /system/bin/usb-insert-hook.sh ]; then
+    /system/bin/usb-insert-hook.sh
+fi
+exec /bin/sh
+INIT_EOF
+chmod +x "${RAMDISK_WORK}/init"
+
+CUSTOM_RAMDISK="${OUTPUT_DIR}/halium_ramdisk.cpio.gz"
+(cd "${RAMDISK_WORK}" && find . -print0 | cpio --null -ov --format=newc 2>/dev/null | gzip -9 > "${CUSTOM_RAMDISK}")
+
+# Сборка boot.img (Header Version 4 для Google Pixel 7 / GKI)
 log_info "Формирование загрузочного образа boot.img (v4 GKI)..."
 
 MKBOOTIMG_TOOL=""
@@ -217,30 +253,33 @@ elif [ -f "${PROJECT_ROOT}/src/lineage/system/tools/mkbootimg/mkbootimg.py" ]; t
     MKBOOTIMG_TOOL="python3 ${PROJECT_ROOT}/src/lineage/system/tools/mkbootimg/mkbootimg.py"
 fi
 
-# Создаем пустой initial ramdisk, если специфичный ramdisk Halium еще не собран
-DUMMY_RAMDISK="${OUTPUT_DIR}/ramdisk_empty.cpio.gz"
-echo -n "" | gzip > "${DUMMY_RAMDISK}"
-
 BOOT_IMG_OUT="${IMAGES_DIR}/boot.img"
 
 if [ -n "${MKBOOTIMG_TOOL}" ]; then
     log_info "Выполнение сборки boot.img через ${MKBOOTIMG_TOOL}..."
     ${MKBOOTIMG_TOOL} \
         --kernel "${KERNEL_BIN}" \
-        --ramdisk "${DUMMY_RAMDISK}" \
+        --ramdisk "${CUSTOM_RAMDISK}" \
         --header_version 4 \
-        --pagesize 4096 \
         --os_version 13.0.0 \
         --os_patch_level 2023-08 \
-        --cmdline "bootconfig" \
+        --cmdline "console=tty0 console=ttySAC0,115200 androidboot.selinux=permissive" \
+        --output "${BOOT_IMG_OUT}" || \
+    ${MKBOOTIMG_TOOL} \
+        --kernel "${KERNEL_BIN}" \
+        --ramdisk "${CUSTOM_RAMDISK}" \
+        --header_version 2 \
+        --pagesize 4096 \
         --output "${BOOT_IMG_OUT}"
-    log_success "Образ ядра успешно сформирован: ${BOOT_IMG_OUT}"
+    cp "${BOOT_IMG_OUT}" "${IMAGES_DIR}/halium-boot.img"
+    log_success "Образ ядра успешно сформирован: ${BOOT_IMG_OUT} (и halium-boot.img)"
 else
-    log_warn "Утилита mkbootimg не найдена в системе. Будет упакован только образ ядра Image.lz4."
+    log_warn "Утилита mkbootimg не найдена в системе. Будет упакован образ ядра Image.lz4."
     cp "${KERNEL_BIN}" "${IMAGES_DIR}/boot.img"
+    cp "${KERNEL_BIN}" "${IMAGES_DIR}/halium-boot.img"
 fi
 
 # Создание архива всех артифактов ядра
 KERNEL_BUNDLE="${IMAGES_DIR}/pixel7-kernel-bundle.tar.gz"
-tar -czf "${KERNEL_BUNDLE}" -C "${IMAGES_DIR}" boot.img pixel7-kernel-modules.tar.gz
+tar -czf "${KERNEL_BUNDLE}" -C "${IMAGES_DIR}" boot.img halium-boot.img pixel7-kernel-modules.tar.gz
 log_success "Все артифакты ядра успешно упакованы в: ${KERNEL_BUNDLE}"

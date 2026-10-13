@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
+    <remove-project name="device/google/gs-common" />
 
     <!-- Google Pixel 7 (panther) & Pixel 7 Pro (cheetah) Pantah Device Trees -->
+
     <project name="LineageOS/android_device_google_panther"
              path="device/google/panther"
              remote="github"

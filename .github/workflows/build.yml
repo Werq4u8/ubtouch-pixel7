@@ -47,6 +47,10 @@ jobs:
         run: |
           ./scripts/03_patch_kernel.sh
 
+      - name: 04 - Compile Linux Kernel & Pack halium-boot.img
+        run: |
+          ./scripts/04_build_kernel.sh
+
       - name: 06 - Prepare and Package Ubuntu Touch Rootfs
         run: |
           ./scripts/06_prepare_rootfs.sh
@@ -58,7 +62,9 @@ jobs:
           path: |
             out/images/rootfs.img
             out/images/boot.img
+            out/images/halium-boot.img
             out/images/*.zip
             out/images/*.tar.gz
           if-no-files-found: warn
           retention-days: 14
+

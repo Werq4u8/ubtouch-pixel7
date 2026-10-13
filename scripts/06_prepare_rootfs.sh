@@ -55,28 +55,28 @@ log_info "=========================================================="
 # ==============================================================================
 log_info "Шаг 1/5: Проверка и загрузка архива Ubuntu Touch Rootfs (arm64)..."
 
-# Официальные зеркала UBports CI
-FOCAL_ROOTFS_URL="https://ci.ubports.com/job/rootfs/job/rootfs-focal-arm64/lastSuccessfulBuild/artifact/ubuntu-touch-android9plus-rootfs-arm64.tar.gz"
-FOCAL_FALLBACK_URL="https://images.ubports.com/ubuntu-touch-focal-arm64.tar.gz"
-XENIAL_ROOTFS_URL="https://ci.ubports.com/job/rootfs/job/rootfs-xenial-arm64/lastSuccessfulBuild/artifact/ubuntu-touch-android9plus-rootfs-arm64.tar.gz"
+# Официальные рабочие зеркала UBports CI (Focal 20.04 и Noble 24.04)
+FOCAL_ROOTFS_URL="https://ci.ubports.com/job/ubuntu-touch-rootfs/job/ubports%252Ffocal/lastSuccessfulBuild/artifact/ubuntu-touch-android9plus-rootfs-arm64.tar.gz"
+NOBLE_ROOTFS_URL="https://ci.ubports.com/job/ubuntu-touch-rootfs/job/ubports%252F24.04-1.x/lastSuccessfulBuild/artifact/ubuntu-touch-android9plus-rootfs-arm64.tar.gz"
+XENIAL_ROOTFS_URL="https://ci.ubports.com/job/xenial-hybris-android9-rootfs-arm64/lastSuccessfulBuild/artifact/ubuntu-touch-android9-arm64.tar.gz"
 
 ROOTFS_ARCHIVE="${DOWNLOAD_DIR}/ubuntu-touch-rootfs-arm64.tar.gz"
 
 download_rootfs() {
     log_info "Попытка загрузки Ubuntu Touch Focal (20.04) Rootfs..."
-    if curl -fL --progress-bar "${FOCAL_ROOTFS_URL}" -o "${ROOTFS_ARCHIVE}"; then
+    if curl -fL --retry 3 "${FOCAL_ROOTFS_URL}" -o "${ROOTFS_ARCHIVE}"; then
         log_success "Focal rootfs успешно загружен."
         return 0
     fi
 
-    log_warn "Не удалось загрузить с основного сервера Focal. Пробуем зеркало: ${FOCAL_FALLBACK_URL}"
-    if curl -fL --progress-bar "${FOCAL_FALLBACK_URL}" -o "${ROOTFS_ARCHIVE}"; then
-        log_success "Focal rootfs успешно загружен с зеркала."
+    log_warn "Не удалось загрузить Focal. Пробуем Ubuntu Touch Noble (24.04): ${NOBLE_ROOTFS_URL}"
+    if curl -fL --retry 3 "${NOBLE_ROOTFS_URL}" -o "${ROOTFS_ARCHIVE}"; then
+        log_success "Noble rootfs успешно загружен."
         return 0
     fi
 
-    log_warn "Focal недоступен, выполняем откат (fallback) на Xenial 16.04..."
-    if curl -fL --progress-bar "${XENIAL_ROOTFS_URL}" -o "${ROOTFS_ARCHIVE}"; then
+    log_warn "Focal/Noble недоступны, выполняем откат (fallback) на Xenial 16.04..."
+    if curl -fL --retry 3 "${XENIAL_ROOTFS_URL}" -o "${ROOTFS_ARCHIVE}"; then
         log_success "Xenial rootfs успешно загружен."
         return 0
     fi

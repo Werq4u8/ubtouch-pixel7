@@ -186,6 +186,8 @@ jobs:
           cat << 'EOF' > .repo/local_manifests/panther.xml
           <?xml version="1.0" encoding="UTF-8"?>
           <manifest>
+            <remove-project name="device/google/gs-common" />
+
             <!-- Pixel 7 Device Trees -->
             <project path="device/google/panther" name="LineageOS/android_device_google_panther" remote="github" revision="lineage-20" />
             <project path="device/google/pantah" name="LineageOS/android_device_google_pantah" remote="github" revision="lineage-20" />
@@ -199,6 +201,7 @@ jobs:
             <project path="vendor/google/gs201" name="TheMuppets/proprietary_vendor_google_gs201" remote="github" revision="lineage-20" />
           </manifest>
           EOF
+
 
       - name: Sync Source Tree
         run: |

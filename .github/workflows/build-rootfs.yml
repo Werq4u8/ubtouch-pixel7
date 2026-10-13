@@ -12,12 +12,14 @@
 name: Build Ubuntu Touch Rootfs & Flashable Package (panther)
 
 on:
+  push:
+    branches: [ main, master ]
   workflow_dispatch:
     inputs:
       rootfs_url:
         description: 'URL of Ubuntu Touch Focal arm64 rootfs tarball'
         required: false
-        default: 'https://ci.ubports.com/job/rootfs/job/rootfs-focal-arm64/lastSuccessfulBuild/artifact/ubuntu-touch-focal-arm64.tar.gz'
+        default: 'https://ci.ubports.com/job/ubuntu-touch-rootfs/job/ubports%252Ffocal/lastSuccessfulBuild/artifact/ubuntu-touch-android9plus-rootfs-arm64.tar.gz'
         type: string
       rootfs_format:
         description: 'Rootfs image format (ext4 or squashfs)'
@@ -32,10 +34,6 @@ on:
         required: true
         default: '4'
         type: string
-  workflow_run:
-    workflows: ["Build Halium 13 for Pixel 7 (panther)"]
-    types:
-      - completed
 
 permissions:
   contents: write
@@ -45,7 +43,6 @@ permissions:
 jobs:
   package-ubuntu-touch:
     name: Package Ubuntu Touch Rootfs & Fastboot Bundle
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 180
 
@@ -53,9 +50,10 @@ jobs:
       DEVICE: panther
       FAMILY: pantah
       ARCH: arm64
-      ROOTFS_URL: ${{ github.event.inputs.rootfs_url || 'https://ci.ubports.com/job/rootfs/job/rootfs-focal-arm64/lastSuccessfulBuild/artifact/ubuntu-touch-focal-arm64.tar.gz' }}
+      ROOTFS_URL: ${{ github.event.inputs.rootfs_url || 'https://ci.ubports.com/job/ubuntu-touch-rootfs/job/ubports%252Ffocal/lastSuccessfulBuild/artifact/ubuntu-touch-android9plus-rootfs-arm64.tar.gz' }}
       ROOTFS_FORMAT: ${{ github.event.inputs.rootfs_format || 'ext4' }}
       ROOTFS_SIZE_GB: ${{ github.event.inputs.rootfs_size_gb || '4' }}
+
 
     steps:
       - name: Checkout Repository

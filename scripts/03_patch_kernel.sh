@@ -56,9 +56,13 @@ elif [ -d "${PROJECT_ROOT}/src/lineage/kernel/google/gs201" ]; then
     KERNEL_ROOT="${PROJECT_ROOT}/src/lineage/kernel/google/gs201"
     log_info "Обнаружено встроенное дерево ядра LineageOS: ${KERNEL_ROOT}"
 else
-    log_warn "Каталог ядра не найден в стандартных путях src/kernel или src/lineage. Создаем структуру-заглушку для подготовки..."
-    KERNEL_ROOT="${PROJECT_ROOT}/src/kernel"
-    mkdir -p "${KERNEL_ROOT}/common/arch/arm64/configs"
+    log_info "Исходники ядра еще не скачаны. Клонируем LineageOS/android_kernel_google_gs201 (shallow)..."
+    mkdir -p "${PROJECT_ROOT}/src/lineage/kernel/google"
+    git clone --depth=1 -b lineage-21 https://github.com/LineageOS/android_kernel_google_gs201.git \
+        "${PROJECT_ROOT}/src/lineage/kernel/google/gs201" || \
+    git clone --depth=1 -b lineage-20 https://github.com/LineageOS/android_kernel_google_gs201.git \
+        "${PROJECT_ROOT}/src/lineage/kernel/google/gs201"
+    KERNEL_ROOT="${PROJECT_ROOT}/src/lineage/kernel/google/gs201"
 fi
 
 # ==============================================================================
@@ -70,6 +74,7 @@ log_info "Шаг 1/3: Интеграция конфигурации Ubuntu Touch
 TARGET_DEFCONFIGS=(
     "${KERNEL_ROOT}/common/arch/arm64/configs/gki_defconfig"
     "${KERNEL_ROOT}/arch/arm64/configs/gki_defconfig"
+    "${KERNEL_ROOT}/arch/arm64/configs/cloudripper_gki_defconfig"
     "${KERNEL_ROOT}/private/google-modules/soc/gs/arch/arm64/configs/pantah_defconfig"
     "${KERNEL_ROOT}/private/devices/google/pantah/pantah_defconfig"
     "${PROJECT_ROOT}/src/lineage/kernel/google/gs201/arch/arm64/configs/pantah_defconfig"
