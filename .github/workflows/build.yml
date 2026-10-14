@@ -13,9 +13,14 @@ on:
         default: 'false'
         type: boolean
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   build:
     name: Build Port Artifacts
+
     runs-on: ubuntu-22.04
     timeout-minutes: 360
 
@@ -75,8 +80,45 @@ jobs:
             out/images/rootfs.img
             out/images/boot.img
             out/images/halium-boot.img
+            out/images/init_boot.img
             out/images/*.zip
             out/images/*.tar.gz
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Publish Images to GitHub Releases
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Ubuntu Touch for Pixel 7 (panther) — Latest Preview"
+          body: |
+            ## 📱 Готовые образы для запуска Ubuntu Touch на Google Pixel 7 (panther)
+            
+            ### 📦 Содержимое релиза:
+            - **`halium-boot.img`** — ядро Linux 5.10 (Header v3) с интерактивным USB-загрузчиком для команды `fastboot boot` (без стирания Android).
+            - **`boot.img`** — чистое GKI ядро (Header v4) для постоянной прошивки.
+            - **`init_boot.img`** — ramdisk (Header v4) для постоянной прошивки.
+            - **`rootfs.img`** — файловая система Ubuntu Touch Focal (20.04 arm64).
+            
+            ### 🚀 Быстрый запуск (Live-тест в RAM без риска для Android):
+            1. Загрузите ядро в оперативку телефона:
+               ```bash
+               fastboot boot halium-boot.img
+               ```
+            2. Когда на экране появится `PLEASE, INSERT UBUNTU-FILE.IMG`, запустите на ПК:
+               ```powershell
+               .\scripts\insert_ubuntu.ps1
+               ```
+          files: |
+            out/images/halium-boot.img
+            out/images/boot.img
+            out/images/init_boot.img
+            out/images/rootfs.img
+            out/images/*.zip
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 

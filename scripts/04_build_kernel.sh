@@ -260,30 +260,44 @@ elif [ -f "${PROJECT_ROOT}/src/lineage/system/tools/mkbootimg/mkbootimg.py" ]; t
 fi
 
 BOOT_IMG_OUT="${IMAGES_DIR}/boot.img"
+HALIUM_BOOT_OUT="${IMAGES_DIR}/halium-boot.img"
+INIT_BOOT_OUT="${IMAGES_DIR}/init_boot.img"
 
 if [ -n "${MKBOOTIMG_TOOL}" ]; then
-    log_info "Выполнение сборки boot.img через ${MKBOOTIMG_TOOL}..."
+    log_info "1/3. Сборка halium-boot.img (Header v3 — для fastboot boot в RAM)..."
     ${MKBOOTIMG_TOOL} \
         --kernel "${KERNEL_BIN}" \
         --ramdisk "${CUSTOM_RAMDISK}" \
+        --header_version 3 \
+        --os_version 13.0.0 \
+        --os_patch_level 2023-08 \
+        --cmdline "console=tty0 console=ttySAC0,115200 androidboot.selinux=permissive" \
+        --output "${HALIUM_BOOT_OUT}" || true
+
+    log_info "2/3. Сборка boot.img (Header v4 — ядро GKI без ramdisk)..."
+    ${MKBOOTIMG_TOOL} \
+        --kernel "${KERNEL_BIN}" \
         --header_version 4 \
         --os_version 13.0.0 \
         --os_patch_level 2023-08 \
         --cmdline "console=tty0 console=ttySAC0,115200 androidboot.selinux=permissive" \
-        --output "${BOOT_IMG_OUT}" || \
+        --output "${BOOT_IMG_OUT}" || cp "${HALIUM_BOOT_OUT}" "${BOOT_IMG_OUT}"
+
+    log_info "3/3. Сборка init_boot.img (Header v4 — рамдиск)..."
     ${MKBOOTIMG_TOOL} \
-        --kernel "${KERNEL_BIN}" \
         --ramdisk "${CUSTOM_RAMDISK}" \
-        --header_version 2 \
-        --pagesize 4096 \
-        --output "${BOOT_IMG_OUT}"
-    cp "${BOOT_IMG_OUT}" "${IMAGES_DIR}/halium-boot.img"
-    log_success "Образ ядра успешно сформирован: ${BOOT_IMG_OUT} (и halium-boot.img)"
+        --header_version 4 \
+        --os_version 13.0.0 \
+        --os_patch_level 2023-08 \
+        --output "${INIT_BOOT_OUT}" || true
+
+    log_success "Образы успешно созданы: halium-boot.img (v3), boot.img (v4), init_boot.img (v4)"
 else
     log_warn "Утилита mkbootimg не найдена в системе. Будет упакован образ ядра Image.lz4."
-    cp "${KERNEL_BIN}" "${IMAGES_DIR}/boot.img"
-    cp "${KERNEL_BIN}" "${IMAGES_DIR}/halium-boot.img"
+    cp "${KERNEL_BIN}" "${BOOT_IMG_OUT}"
+    cp "${KERNEL_BIN}" "${HALIUM_BOOT_OUT}"
 fi
+
 
 # Создание архива всех артифактов ядра
 KERNEL_BUNDLE="${IMAGES_DIR}/pixel7-kernel-bundle.tar.gz"
