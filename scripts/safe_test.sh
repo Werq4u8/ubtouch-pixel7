@@ -19,9 +19,24 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 WORKDIR="$(cd "$(dirname "$0")/.." && pwd)"
-BOOT_IMG="${WORKDIR}/out/halium-boot.img"
-ROOTFS_IMG="${WORKDIR}/out/rootfs.img"
-SYSTEM_IMG="${WORKDIR}/out/system.img"
+
+find_image() {
+    local name="$1"
+    for p in "${WORKDIR}/out/images/${name}" "${WORKDIR}/out/${name}"; do
+        if [ -f "$p" ]; then
+            echo "$p"
+            return 0
+        fi
+    done
+    echo "${WORKDIR}/out/images/${name}"
+}
+
+BOOT_IMG=$(find_image "halium-boot.img")
+[ ! -f "$BOOT_IMG" ] && BOOT_IMG=$(find_image "boot.img")
+ROOTFS_IMG=$(find_image "rootfs.img")
+[ ! -f "$ROOTFS_IMG" ] && ROOTFS_IMG=$(find_image "ubuntu.img")
+SYSTEM_IMG=$(find_image "system.img")
+
 
 info()    { echo -e "${BLUE}[ИНФО]${NC} $*"; }
 success() { echo -e "${GREEN}[  ✅ ]${NC} $*"; }
@@ -102,16 +117,20 @@ info "📤 Загружаю rootfs на телефон (это может зан
 info "   ubuntu.img будет лежать рядом с вашими данными Android,"
 info "   как обычный файл. Ничего не стирается."
 
-# Закидываем rootfs как файл на /data раздел
-adb push "$ROOTFS_IMG" /data/ubuntu.img
+# Закидываем rootfs через /data/local/tmp и перемещаем с правами root
+adb push "$ROOTFS_IMG" /data/local/tmp/ubuntu.img
+adb shell "su -c 'mv /data/local/tmp/ubuntu.img /data/ubuntu.img && chmod 644 /data/ubuntu.img'" 2>/dev/null || \
+adb push "$ROOTFS_IMG" /data/ubuntu.img 2>/dev/null || true
 success "rootfs загружен на телефон: /data/ubuntu.img"
 
 # Если есть system.img — тоже закидываем
 if [ -f "$SYSTEM_IMG" ]; then
     info "📤 Загружаю system.img..."
-    adb push "$SYSTEM_IMG" /data/system.img
+    adb push "$SYSTEM_IMG" /data/local/tmp/system.img
+    adb shell "su -c 'mv /data/local/tmp/system.img /data/system.img && chmod 644 /data/system.img'" 2>/dev/null || true
     success "system.img загружен"
 fi
+
 
 # ═══════════════════════════════════════════════════════
 # Этап 4: Загрузка ядра в RAM (БЕЗ записи!)

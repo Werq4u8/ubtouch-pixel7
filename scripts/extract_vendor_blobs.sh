@@ -66,9 +66,10 @@ mkdir -p "$BLOB_DIR"
 # ═══════════════════════════════════════════════════════
 echo ""
 info "📦 [1/8] Дамп vendor раздела (raw image)..."
-VENDOR_BLOCK=$(adb shell "su -c 'readlink -f /dev/block/by-name/vendor'" 2>/dev/null)
+VENDOR_BLOCK=$(adb shell "su -c 'readlink -f /dev/block/by-name/vendor'" 2>/dev/null | tr -d '\r\n')
 if [ -n "$VENDOR_BLOCK" ]; then
-    adb shell "su -c 'dd if=$VENDOR_BLOCK bs=4M'" > "$BLOB_DIR/vendor.img" 2>/dev/null
+    # Используем exec-out вместо shell, чтобы не повредить бинарный поток символами CRLF (\r\n)
+    adb exec-out "su -c 'dd if=$VENDOR_BLOCK bs=4M'" > "$BLOB_DIR/vendor.img" 2>/dev/null
     VENDOR_SIZE=$(du -h "$BLOB_DIR/vendor.img" | cut -f1)
     success "vendor.img сохранён ($VENDOR_SIZE)"
 else
@@ -80,7 +81,7 @@ fi
 # ═══════════════════════════════════════════════════════
 info "📦 [2/8] Копирование /vendor/lib64 (HAL библиотеки)..."
 mkdir -p "$BLOB_DIR/vendor"
-adb shell "su -c 'tar cf - /vendor'" 2>/dev/null | tar xf - -C "$BLOB_DIR/" 2>/dev/null && \
+adb exec-out "su -c 'tar cf - /vendor'" 2>/dev/null | tar xf - -C "$BLOB_DIR/" 2>/dev/null && \
     success "/vendor скопирован" || {
     warn "tar не сработал, копируем по частям..."
     for dir in lib lib64 etc firmware bin; do
@@ -122,7 +123,7 @@ mkdir -p "$BLOB_DIR/firmware"
 # Wi-Fi BCM4389 firmware
 for fw_path in /vendor/firmware /vendor/firmware/bcm4389 /lib/firmware; do
     adb shell "su -c 'ls $fw_path'" &>/dev/null && {
-        adb shell "su -c 'tar cf - $fw_path'" 2>/dev/null | tar xf - -C "$BLOB_DIR/firmware/" 2>/dev/null
+        adb exec-out "su -c 'tar cf - $fw_path'" 2>/dev/null | tar xf - -C "$BLOB_DIR/firmware/" 2>/dev/null
         success "Firmware из $fw_path скопирован"
     }
 done
@@ -131,7 +132,7 @@ done
 for modem_path in /vendor/firmware_mnt /vendor/modem /dev/block/by-name/modem; do
     adb shell "su -c 'ls $modem_path'" &>/dev/null && {
         info "  Найден modem firmware: $modem_path"
-        adb shell "su -c 'tar cf - $modem_path'" 2>/dev/null | tar xf - -C "$BLOB_DIR/firmware/" 2>/dev/null
+        adb exec-out "su -c 'tar cf - $modem_path'" 2>/dev/null | tar xf - -C "$BLOB_DIR/firmware/" 2>/dev/null
     }
 done
 
@@ -142,12 +143,13 @@ success "Firmware извлечены"
 # ═══════════════════════════════════════════════════════
 info "📦 [5/8] Извлечение конфигурации ядра..."
 
-adb shell "su -c 'cat /proc/config.gz'" 2>/dev/null | gunzip > "$BLOB_DIR/current_kernel_config" 2>/dev/null && \
+adb exec-out "su -c 'cat /proc/config.gz'" 2>/dev/null | gunzip > "$BLOB_DIR/current_kernel_config" 2>/dev/null && \
     success "Конфиг ядра извлечён" || {
     adb shell "su -c 'zcat /proc/config.gz'" > "$BLOB_DIR/current_kernel_config" 2>/dev/null && \
         success "Конфиг ядра извлечён (zcat)" || \
         warn "config.gz недоступен"
 }
+
 
 # Текущие модули ядра
 adb shell "su -c 'find /vendor/lib/modules -name *.ko'" > "$BLOB_DIR/kernel_modules_list.txt" 2>/dev/null

@@ -7,43 +7,43 @@
     <project name="LineageOS/android_device_google_panther"
              path="device/google/panther"
              remote="github"
-             revision="lineage-20" />
+             revision="lineage-20.0" />
 
     <project name="LineageOS/android_device_google_pantah"
              path="device/google/pantah"
              remote="github"
-             revision="lineage-20" />
+             revision="lineage-20.0" />
 
     <!-- Google Tensor G2 Platform & Common Trees -->
     <project name="LineageOS/android_device_google_gs201"
              path="device/google/gs201"
              remote="github"
-             revision="lineage-20" />
+             revision="lineage-20.0" />
 
     <project name="LineageOS/android_device_google_gs-common"
              path="device/google/gs-common"
              remote="github"
-             revision="lineage-20" />
+             revision="lineage-20.0" />
 
     <!-- Ядро Linux 5.10 для Google Tensor G2 (gs201) -->
     <project name="LineageOS/android_kernel_google_gs201"
              path="kernel/google/gs201"
              remote="github"
-             revision="lineage-20" />
+             revision="lineage-20.0" />
 
     <!-- Проприетарные бинарные блобы вендора (TheMuppets) -->
     <project name="TheMuppets/proprietary_vendor_google_panther"
              path="vendor/google/panther"
              remote="github"
-             revision="lineage-20" />
+             revision="lineage-20.0" />
 
     <project name="TheMuppets/proprietary_vendor_google_pantah"
              path="vendor/google/pantah"
              remote="github"
-             revision="lineage-20" />
+             revision="lineage-20.0" />
 
     <project name="TheMuppets/proprietary_vendor_google_gs201"
              path="vendor/google/gs201"
              remote="github"
-             revision="lineage-20" />
+             revision="lineage-20.0" />
 </manifest>

@@ -90,21 +90,17 @@ else
     cat <<'EOF' > "${LOCAL_MANIFEST_DIR}/pixel7_panther.xml"
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
-    <remove-project name="LineageOS/android_device_google_panther" />
-    <remove-project name="LineageOS/android_device_google_pantah" />
-    <remove-project name="LineageOS/android_device_google_gs201" />
-    <remove-project name="LineageOS/android_device_google_gs-common" />
-    <remove-project name="LineageOS/android_kernel_google_gs201" />
+    <remove-project name="device/google/gs-common" />
 
-    <project name="LineageOS/android_device_google_panther" path="device/google/panther" remote="github" revision="lineage-20" />
-    <project name="LineageOS/android_device_google_pantah" path="device/google/pantah" remote="github" revision="lineage-20" />
-    <project name="LineageOS/android_device_google_gs201" path="device/google/gs201" remote="github" revision="lineage-20" />
-    <project name="LineageOS/android_device_google_gs-common" path="device/google/gs-common" remote="github" revision="lineage-20" />
-    <project name="LineageOS/android_kernel_google_gs201" path="kernel/google/gs201" remote="github" revision="lineage-20" />
+    <project name="LineageOS/android_device_google_panther" path="device/google/panther" remote="github" revision="lineage-20.0" />
+    <project name="LineageOS/android_device_google_pantah" path="device/google/pantah" remote="github" revision="lineage-20.0" />
+    <project name="LineageOS/android_device_google_gs201" path="device/google/gs201" remote="github" revision="lineage-20.0" />
+    <project name="LineageOS/android_device_google_gs-common" path="device/google/gs-common" remote="github" revision="lineage-20.0" />
+    <project name="LineageOS/android_kernel_google_gs201" path="kernel/google/gs201" remote="github" revision="lineage-20.0" />
 
-    <project name="TheMuppets/proprietary_vendor_google_panther" path="vendor/google/panther" remote="github" revision="lineage-20" />
-    <project name="TheMuppets/proprietary_vendor_google_pantah" path="vendor/google/pantah" remote="github" revision="lineage-20" />
-    <project name="TheMuppets/proprietary_vendor_google_gs201" path="vendor/google/gs201" remote="github" revision="lineage-20" />
+    <project name="TheMuppets/proprietary_vendor_google_panther" path="vendor/google/panther" remote="github" revision="lineage-20.0" />
+    <project name="TheMuppets/proprietary_vendor_google_pantah" path="vendor/google/pantah" remote="github" revision="lineage-20.0" />
+    <project name="TheMuppets/proprietary_vendor_google_gs201" path="vendor/google/gs201" remote="github" revision="lineage-20.0" />
 </manifest>
 EOF
 fi
@@ -149,7 +145,7 @@ log_info "=========================================================="
 mkdir -p "${KERNEL_DIR}"
 cd "${KERNEL_DIR}"
 
-KERNEL_BRANCH="android-gs-pantah-5.10-android13"
+KERNEL_BRANCH="android-gs-pantah-5.10-android14"
 
 if [ ! -d "${KERNEL_DIR}/.repo" ]; then
     log_info "Инициализация репозитория ядра Google Pantah (${KERNEL_BRANCH})..."

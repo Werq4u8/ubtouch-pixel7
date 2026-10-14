@@ -92,14 +92,12 @@ jobs:
       - name: Set up 16GB Swap File
         run: |
           echo "==> Allocating 16 GB swap file to mitigate ninja/metalava OOM crashes..."
-          if [ ! -f /swapfile ]; then
-            sudo fallocate -l 16G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=16384
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-          else
-            echo "Swapfile already exists."
-          fi
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo fallocate -l 16G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=16384
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
           free -h
 
       - name: Install AOSP & LineageOS Build Prerequisites
@@ -113,21 +111,15 @@ jobs:
             ccache \
             curl \
             flex \
-            g++-multilib \
-            gcc-multilib \
             git \
             git-lfs \
             gnupg \
             gperf \
             imagemagick \
-            lib32ncurses5-dev \
-            lib32readline-dev \
-            lib32z1-dev \
             libelf-dev \
             liblz4-tool \
             libncurses5 \
             libncurses5-dev \
-            libsdl1.2-dev \
             libssl-dev \
             libxml2 \
             libxml2-utils \
@@ -189,18 +181,19 @@ jobs:
             <remove-project name="device/google/gs-common" />
 
             <!-- Pixel 7 Device Trees -->
-            <project path="device/google/panther" name="LineageOS/android_device_google_panther" remote="github" revision="lineage-20" />
-            <project path="device/google/pantah" name="LineageOS/android_device_google_pantah" remote="github" revision="lineage-20" />
-            <project path="device/google/gs201" name="LineageOS/android_device_google_gs201" remote="github" revision="lineage-20" />
-            <project path="device/google/gs-common" name="LineageOS/android_device_google_gs-common" remote="github" revision="lineage-20" />
-            <project path="kernel/google/gs201" name="LineageOS/android_kernel_google_gs201" remote="github" revision="lineage-20" />
+            <project path="device/google/panther" name="LineageOS/android_device_google_panther" remote="github" revision="lineage-20.0" />
+            <project path="device/google/pantah" name="LineageOS/android_device_google_pantah" remote="github" revision="lineage-20.0" />
+            <project path="device/google/gs201" name="LineageOS/android_device_google_gs201" remote="github" revision="lineage-20.0" />
+            <project path="device/google/gs-common" name="LineageOS/android_device_google_gs-common" remote="github" revision="lineage-20.0" />
+            <project path="kernel/google/gs201" name="LineageOS/android_kernel_google_gs201" remote="github" revision="lineage-20.0" />
 
             <!-- Proprietary Vendor Blobs for Pantah / Panther -->
-            <project path="vendor/google/panther" name="TheMuppets/proprietary_vendor_google_panther" remote="github" revision="lineage-20" />
-            <project path="vendor/google/pantah" name="TheMuppets/proprietary_vendor_google_pantah" remote="github" revision="lineage-20" />
-            <project path="vendor/google/gs201" name="TheMuppets/proprietary_vendor_google_gs201" remote="github" revision="lineage-20" />
+            <project path="vendor/google/panther" name="TheMuppets/proprietary_vendor_google_panther" remote="github" revision="lineage-20.0" />
+            <project path="vendor/google/pantah" name="TheMuppets/proprietary_vendor_google_pantah" remote="github" revision="lineage-20.0" />
+            <project path="vendor/google/gs201" name="TheMuppets/proprietary_vendor_google_gs201" remote="github" revision="lineage-20.0" />
           </manifest>
           EOF
+
 
 
       - name: Sync Source Tree

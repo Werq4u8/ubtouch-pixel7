@@ -55,11 +55,7 @@ PRODUCT_PACKAGES += \
     libbinder \
     libbinder_ndk \
     android.hardware.graphics.allocator@4.0 \
-    android.hardware.graphics.mapper@4.0 \
-    ubtouch-radio-bridge \
-    ubtouch-camera-bridge \
-    ubtouch-audio-bridge \
-    ubtouch-gnss-bridge
+    android.hardware.graphics.mapper@4.0
 
 # Install Halium init script and interactive USB loader hook to ramdisk and system
 PRODUCT_COPY_FILES += \
@@ -68,7 +64,4 @@ PRODUCT_COPY_FILES += \
     device/google/panther/usb-insert-hook.sh:$(TARGET_COPY_OUT_RAMDISK)/system/bin/usb-insert-hook.sh \
     device/google/panther/usb-insert-hook.sh:$(TARGET_COPY_OUT_SYSTEM)/bin/usb-insert-hook.sh
 
-# Device tree overlays
-PRODUCT_PACKAGE_OVERLAYS += \
-    device/google/panther/overlay-halium
 

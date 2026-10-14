@@ -158,9 +158,15 @@ if [ "${BUILD_SUCCESS}" -eq 0 ]; then
     log_info "Генерация конфигурации: make ${DEFCONFIG_NAME}..."
     make O="${OUTPUT_DIR}" "${DEFCONFIG_NAME}"
 
-    # Убедимся, что опции не приводят к ошибкам Werror на новых версиях Clang
-    scripts/config --file "${OUTPUT_DIR}/.config" -d CONFIG_WERROR -d CONFIG_LTO_CLANG_THIN -d CONFIG_LTO_CLANG_FULL || true
+    # Отключаем Werror, LTO (жрущий RAM на линковке vmlinux) и BTF
+    scripts/config --file "${OUTPUT_DIR}/.config" \
+        -d CONFIG_WERROR \
+        -d CONFIG_LTO_CLANG_THIN \
+        -d CONFIG_LTO_CLANG_FULL \
+        -e CONFIG_LTO_NONE \
+        -d CONFIG_DEBUG_INFO_BTF || true
     make O="${OUTPUT_DIR}" olddefconfig
+
 
     log_info "Компиляция Image.lz4, Image и модулей (потоков: ${BUILD_JOBS})..."
     make -j"${BUILD_JOBS}" O="${OUTPUT_DIR}" Image.lz4 Image modules 2>&1 | tee "${LOG_DIR}/kernel_make.log"
