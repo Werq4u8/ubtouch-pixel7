@@ -251,13 +251,16 @@ CUSTOM_RAMDISK="${OUTPUT_DIR}/halium_ramdisk.cpio.gz"
 log_info "Формирование загрузочного образа boot.img (v4 GKI)..."
 
 MKBOOTIMG_TOOL=""
-if command -v mkbootimg >/dev/null 2>&1; then
-    MKBOOTIMG_TOOL="mkbootimg"
-elif [ -f "${PROJECT_ROOT}/src/lineage/out/host/linux-x86/bin/mkbootimg" ]; then
-    MKBOOTIMG_TOOL="${PROJECT_ROOT}/src/lineage/out/host/linux-x86/bin/mkbootimg"
+if [ -f "${PROJECT_ROOT}/tools/mkbootimg.py" ]; then
+    MKBOOTIMG_TOOL="python3 ${PROJECT_ROOT}/tools/mkbootimg.py"
 elif [ -f "${PROJECT_ROOT}/src/lineage/system/tools/mkbootimg/mkbootimg.py" ]; then
     MKBOOTIMG_TOOL="python3 ${PROJECT_ROOT}/src/lineage/system/tools/mkbootimg/mkbootimg.py"
+elif [ -f "${PROJECT_ROOT}/src/lineage/out/host/linux-x86/bin/mkbootimg" ]; then
+    MKBOOTIMG_TOOL="${PROJECT_ROOT}/src/lineage/out/host/linux-x86/bin/mkbootimg"
+elif command -v mkbootimg >/dev/null 2>&1; then
+    MKBOOTIMG_TOOL="mkbootimg"
 fi
+
 
 BOOT_IMG_OUT="${IMAGES_DIR}/boot.img"
 HALIUM_BOOT_OUT="${IMAGES_DIR}/halium-boot.img"
@@ -283,15 +286,23 @@ if [ -n "${MKBOOTIMG_TOOL}" ]; then
         --cmdline "console=tty0 console=ttySAC0,115200 androidboot.selinux=permissive" \
         --output "${BOOT_IMG_OUT}" || cp "${HALIUM_BOOT_OUT}" "${BOOT_IMG_OUT}"
 
+    touch "${OUTPUT_DIR}/dummy_kernel"
     log_info "3/3. Сборка init_boot.img (Header v4 — рамдиск)..."
     ${MKBOOTIMG_TOOL} \
+        --kernel "${OUTPUT_DIR}/dummy_kernel" \
         --ramdisk "${CUSTOM_RAMDISK}" \
         --header_version 4 \
         --os_version 13.0.0 \
         --os_patch_level 2023-08 \
         --output "${INIT_BOOT_OUT}" || true
 
-    log_success "Образы успешно созданы: halium-boot.img (v3), boot.img (v4), init_boot.img (v4)"
+    # Проверяем, что образы успешно созданы и имеют ненулевой размер
+    if [ ! -s "${HALIUM_BOOT_OUT}" ]; then
+        log_error "halium-boot.img не создан или пуст!"
+        exit 1
+    fi
+    log_success "Образы успешно созданы: halium-boot.img (v3, $(du -h "${HALIUM_BOOT_OUT}" | cut -f1)), boot.img (v4, $(du -h "${BOOT_IMG_OUT}" | cut -f1))"
+
 else
     log_warn "Утилита mkbootimg не найдена в системе. Будет упакован образ ядра Image.lz4."
     cp "${KERNEL_BIN}" "${BOOT_IMG_OUT}"
