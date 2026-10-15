@@ -28,7 +28,11 @@ import os
 import re
 import tempfile
 
-from gki.generate_gki_certificate import generate_gki_certificate
+try:
+    from gki.generate_gki_certificate import generate_gki_certificate
+except Exception:
+    generate_gki_certificate = None
+
 
 # Constant and structure definition is in
 # system/tools/mkbootimg/include/bootimg/bootimg.h
@@ -597,17 +601,20 @@ def add_boot_image_signature(args, pagesize):
 
     # Outputs the signed vbmeta to a separate file, then append to boot.img
     # as the boot signature.
-    with tempfile.TemporaryDirectory() as temp_out_dir:
-        boot_signature_output = os.path.join(temp_out_dir, 'boot_signature')
-        generate_gki_certificate(
-            image=args.output.name, avbtool=args.gki_signing_avbtool_path,
-            name='boot', algorithm=args.gki_signing_algorithm,
-            key=args.gki_signing_key, salt='d00df00d',
-            additional_avb_args=args.gki_signing_signature_args.split(),
-            output=boot_signature_output,
-        )
-        with open(boot_signature_output, 'rb') as boot_signature:
-            boot_signature_bytes = boot_signature.read()
+    boot_signature_bytes = b''
+    if generate_gki_certificate and args.gki_signing_key:
+        with tempfile.TemporaryDirectory() as temp_out_dir:
+            boot_signature_output = os.path.join(temp_out_dir, 'boot_signature')
+            generate_gki_certificate(
+                image=args.output.name, avbtool=args.gki_signing_avbtool_path,
+                name='boot', algorithm=args.gki_signing_algorithm,
+                key=args.gki_signing_key, salt='d00df00d',
+                additional_avb_args=args.gki_signing_signature_args.split(),
+                output=boot_signature_output,
+            )
+            with open(boot_signature_output, 'rb') as boot_signature:
+                boot_signature_bytes = boot_signature.read()
+
             if len(boot_signature_bytes) > BOOT_IMAGE_V4_SIGNATURE_SIZE:
                 raise ValueError(
                     f'boot sigature size is > {BOOT_IMAGE_V4_SIGNATURE_SIZE}')
