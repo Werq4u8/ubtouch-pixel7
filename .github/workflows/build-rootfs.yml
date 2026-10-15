@@ -117,7 +117,12 @@ jobs:
           sudo cp -av ${{ github.workspace }}/device/panther/device_panther.json usr/share/halium/panther/
 
           echo "==> Setting up Halium mount directories & permissions..."
-          sudo mkdir -p android vendor apex metadata oem
+          for dir in android vendor apex metadata oem; do
+            if [ ! -d "$dir" ] && [ ! -L "$dir" ]; then
+              sudo mkdir -p "$dir" || true
+            fi
+          done
+
           sudo chown -R root:root etc/ usr/ || true
           sudo chmod 644 etc/ubuntu-touch-session.d/panther.conf || true
           sudo chmod 600 etc/NetworkManager/conf.d/panther-wifi.conf || true
