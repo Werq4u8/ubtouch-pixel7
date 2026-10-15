@@ -5,8 +5,16 @@
 [![Ubuntu Touch](https://img.shields.io/badge/Ubuntu_Touch-Focal_20.04-green.svg)](https://ubports.com/)
 [![Android Base](https://img.shields.io/badge/Android_Base-LineageOS_20_(Android_13)-brightgreen.svg)](https://lineageos.org/)
 [![Kernel](https://img.shields.io/badge/Kernel-Linux_5.10_GKI_2.0-purple.svg)](https://android.googlesource.com/kernel/common/)
+[![Status](https://img.shields.io/badge/Status-Alpha_Work_in_Progress-yellow.svg)]()
+
+> [!WARNING]
+> ### 🚧 Проект находится в стадии активной разработки (Work in Progress / Alpha Bring-up)
+> **Текущий статус**: Экспериментальный этап отладки первичной загрузки ядра (Bring-up) под архитектуру Google Tensor G2 (GKI 2.0).
+> 
+> Проект **не готов для повседневного использования** (Daily Driver). Образы предназначены исключительно для разработчиков и тестирования в оперативной памяти через `fastboot boot` (без изменения постоянной памяти телефона). Если вы не уверены в своих действиях — дождитесь стабильного бета-релиза.
 
 Полностью автоматизированный проект портирования операционной системы **Ubuntu Touch (Lomiri)** на смартфон **Google Pixel 7** (кодовое имя: `panther`, семейство: `pantah`, платформа: `gs201` / Google Tensor G2) на базе **Android 13 (LineageOS 20)** и **Halium 13 / GKI 2.0**.
+
 
 ---
 
